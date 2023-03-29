@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+import uuid
+import email
+import subprocess
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.audio import MIMEAudio
+import azure.cognitiveservices.speech as speechsdk
+
+def transcribe_voicemail(file_path, api_key, region):
+    speech_config = speechsdk.SpeechConfig(subscription=api_key, region=region)
+    audio_input = speechsdk.AudioConfig(filename=file_path)
+    speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_input)
+
+    done = False
+
+    def stop_cb(evt):
+        nonlocal done
+        done = True
+
+    speech_recognizer.recognized.connect(stop_cb)
+    speech_recognizer.start_continuous_recognition()
+    while not done:
+        pass
+
+    return speech_recognizer.result.text
+
+def convert_wav_to_mp3(wav_path, mp3_path):
+    subprocess.run(['lame', '--silent', wav_path, mp3_path])
+
+def main():
+    # Replace these with the API key and region from your Azure Speech Service resource
+    api_key = 'your_api_key_here'
+    region = 'your_region_here'
+
+    msg = email.message_from_string(sys.stdin.read())
+
+    if msg.is_multipart():
+        for part in msg.walk():
+            content_type = part.get_content_type()
+            content_disposition = part.get('Content-Disposition')
+
+            if content_type == 'audio/x-wav' and content_disposition is not None:
+                wav_data = part.get_payload(decode=True)
+                wav_path = '/tmp/voicemail_{}.wav'.format(uuid.uuid4())
+                with open(wav_path, 'wb') as f:
+                    f.write(wav_data)
+
+                transcription = transcribe_voicemail(wav_path, api_key, region)
+
+                mp3_path = wav_path.replace('.wav', '.mp3')
+                convert_wav_to_mp3(wav_path, mp3_path)
+
+                with open(mp3_path, 'rb') as f:
+                    mp3_data = f.read()
+
+                os.unlink(wav_path)
+                os.unlink(mp3_path)
+
+                # Replace the WAV attachment with the MP3 attachment
+                msg.attach(MIMEAudio(mp3_data, _subtype='mpeg', filename='voicemail.mp3'))
+                msg.del_param('Content-Type')
+                msg.set_type('multipart/mixed')
+
+                for part in msg.walk():
+                    if part.get_content_type() == 'text/plain':
+                        body = part.get_payload()
+                        body = body.replace('{{{{TRANSCRIPTION}}}}', transcription)
+                        part.set_payload(body)
+                        part.set_type('text/html')
+
+    print(msg.as_string())
+
+if __name__ == '__main__':
+    main()
