@@ -1,49 +1,70 @@
 # FreePBX Azure VoicemailTranscriptions
 A script to transcribe voicemail messages in FreePBX using Azure Cognitive Services and store them in the voicemail message email.
 
-## Requirements
+# Requirements
+### Python 3.6 or higher
+### FreePBX 15 or higher
+### An Azure Cognitive Services account with a Speech Services resource
+<br>
 
-*Python 3.6 or higher
-*FreePBX 15 or higher
-*An Azure Cognitive Services account with a Speech Services resource
+# Installation
+## Option 1 - Automatic Via Script
 
-## Installation
+### Clone the Repo
+```Bash
+git clone https://github.com/Souced/FreePBX_AzureVoicemailTranscriptions.git
+```
 
-# Install EPEL repository and Microsoft's repository
+### Run the install script
+```Bash
+cd FreePBX_AzureVoicemailTranscriptions
+sudo ./install.sh
+```
+Provide your api key and region when prompted.
+Head to the <b>FreePBX Setup<b> Section.
+
+## Option 2 - Manually
+### Install EPEL repository and Microsoft's repository
 ```Bash
 sudo yum install epel-release
 sudo rpm -Uvh https://packages.microsoft.com/config/rhel/7/packages-microsoft-prod.rpm
 ```
-# Install Python 3, pip and LAME
+### Install Python 3, pip and LAME
 ```Bash
 sudo yum install python3 python3-pip
 sudo rpm --import http://li.nux.ro/download/nux/RPM-GPG-KEY-nux.ro
 sudo rpm -Uvh http://li.nux.ro/download/nux/dextop/el7/x86_64/nux-dextop-release-0-5.el7.nux.noarch.rpm
 sudo yum install lame
 ```
-# Install the compatible OpenSSL libraries:
+### Install the compatible OpenSSL libraries:
 ```Bash
 sudo yum install compat-openssl10
 ```
-# Install the Azure Speech SDK for Python
+### Install the Azure Speech SDK for Python
 ```Bash
 sudo pip3 install azure-cognitiveservices-speech
 ```
-# Clone the Repo
+### Clone the Repo
 ```Bash
 git clone https://github.com/Souced/FreePBX_AzureVoicemailTranscriptions.git
 ```
-# Install the scripts
+### Install the scripts and config file
 ```Bash
 cd FreePBX_AzureVoicemailTranscriptions
 cp emailproc /usr/local/bin
 cp sttparse /usr/local/bin
 chmod +x /urs/local/bin/emailproc
 chmod +x /urs/local/bin/sttparse
+cp azure_config.default.conf /usr/local/bin/azure_config.conf
+chmod 644 /usr/local/bin/azure_config.conf
 ```
-# Modify the sttparse script
-    api_key = 'your_api_key_here'
-    region = 'your_region_here'
+### Modify the config file
+Replace $api_key with your api key and region with your region.
+
+```Bash
+echo "api_key=$api_key" > /usr/local/bin/azure_config.conf
+echo "region=$region" >> /usr/local/bin/azure_config.conf
+```
 
 # FreePBX Setup
 In FreePBX browse to Settings -> Voicemail Admin -> Settings -> Email Config then add the transcription tag {{{{TRANSCRIPTION}}}} to the Email Body. The script will search for this tag to replace with the transcription text. The script will automatically change the content type to text/html. Here is a sample html email:
@@ -85,8 +106,8 @@ Visit <a href="https://your.pbxaddress.tld">https://your.pbxaddress.tld</a> to c
 Finally, set the Mail Command value to /usr/local/bin/emailproc
 
 
-## Contributing
+# Contributing
 Contributions are welcome! To contribute to this project, please fork the repository and submit a pull request.
 
-## License
+# License
 This project is licensed under the Unlicense - see the [LICENSE](LICENSE) file for details.
