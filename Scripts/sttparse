@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import logging
 import sys
 import os
 import uuid
@@ -12,7 +13,11 @@ import azure.cognitiveservices.speech as speechsdk
 from azure.cognitiveservices.speech.translation import TranslationRecognizer, TranslationConfig
 import configparser
 
+
 def identify_language(file_path, api_key, region):
+    """
+    Identify the language of the voicemail using Azure's TranslationRecognizer.
+    """
     try:
         translation_config = TranslationConfig(subscription=api_key, region=region)
         audio_input = speechsdk.AudioConfig(filename=file_path)
@@ -24,20 +29,24 @@ def identify_language(file_path, api_key, region):
         else:
             return None
     except Exception as e:
-        print(f"Error during language identification: {e}")
+        logging.error(f"Error during language identification: {e}")
         return None
 
+
 def transcribe_voicemail(file_path, api_key, region, language):
+    """
+    Transcribe the voicemail using Azure's SpeechRecognizer.
+    """
     try:
         speech_config = speechsdk.SpeechConfig(subscription=api_key, region=region, speech_recognition_language=language)
         audio_input = speechsdk.AudioConfig(filename=file_path)
         speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_input)
     except Exception as e:
-        print(f"Error initializing Azure Cognitive Services: {e}")
+        logging.error(f"Error initializing Azure Cognitive Services: {e}")
         return "Transcription unavailable"
     done = False
 
-    def stop_cb(evt
+    def stop_cb(evt):
         nonlocal done
         done = True
 
@@ -48,20 +57,25 @@ def transcribe_voicemail(file_path, api_key, region, language):
 
     return speech_recognizer.result.text
 
+
 def convert_wav_to_mp3(wav_path, mp3_path):
+    """
+    Convert the voicemail from WAV to MP3 using `lame`.
+    """
     try:
         subprocess.run(['lame', '--silent', wav_path, mp3_path])
     except Exception as e:
-        print(f"Error converting WAV to MP3: {e}")
+        logging.error(f"Error converting WAV to MP3: {e}")
 
-def main():
+
+def process_email(email_str):
     # Read API key and region from the configuration file
     config = configparser.ConfigParser()
     config.read('/usr/local/bin/azure_config.conf')
     api_key = config.get('DEFAULT', 'api_key')
     region = config.get('DEFAULT', 'region')
 
-    msg = email.message_from_string(sys.stdin.read())
+    msg = email.message_from_string(email_str)
 
     if msg.is_multipart():
         for part in msg.walk():
@@ -96,7 +110,7 @@ def main():
                     # Replace the WAV attachment with the MP3 attachment
                     msg.attach(MIMEAudio(mp3_data, _subtype='mpeg', filename='voicemail.mp3'))
                 except Exception as e:
-                    print(f"Error during WAV to MP3 conversion: {e}")
+                    logging.error(f"Error during WAV to MP3 conversion: {e}")
 
                     with open(wav_path, 'rb') as f:
                         wav_data = f.read()
@@ -114,6 +128,16 @@ def main():
                         part.set_type('text/html')
 
     print(msg.as_string())
+
+
+def process_email_from_stdin():
+    email_str = sys.stdin.read()
+    process_email(email_str)
+
+def main():
+    log_file_path = '/var/log/sttparse.log'
+    logging.basicConfig(filename=log_file_path, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    process_email_from_stdin()
 
 if __name__ == '__main__':
     main()
